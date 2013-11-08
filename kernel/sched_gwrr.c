@@ -35,7 +35,6 @@ static struct task_struct *pick_next_task_gwrr(struct rq *rq)
 
 	/* Check for empty queue. */
 	if (list_empty(queue)) {
-		printk("GWRR checked, no tasks left\n");
 		return NULL; /* no GWRR tasks left! */
 	}
 
@@ -46,9 +45,11 @@ static struct task_struct *pick_next_task_gwrr(struct rq *rq)
 	if (next->rq != rq) {
 		return NULL;
 	}
+	
+	printk("GWRR checked, task found!\n");
 
-	/* Assumes we add a gwrr_se field to struct task_struct */
-	p = container_of(gwrr_se, struct task_struct, rt);
+	/* Find task struct from gwrr sched entity */
+	p = container_of(next, struct task_struct, gwrr_se);
 	/* note start time */
 	next->starttime = rq->clock;
 	/* Hmmmm.... */
@@ -62,10 +63,10 @@ static void enqueue_task_gwrr(struct rq *rq, struct task_struct *p, int wakeup)
 
 	queue = &one_queue;
 
-	new = p->gwrr_se;
+	new = &p->gwrr_se;
 	/* add before the head of the queue - effectively
  	 * putting the new task at the end of the queue! */ 
-	list_add_tail(queue,new);
+	list_add_tail(&new->run_list,queue);
 
 	/* Handle wakeup... */	
 }
@@ -92,7 +93,7 @@ static void yield_task_gwrr(struct rq *rq)
 	/* Move task back to end of queue */
 	gse = list_entry(queue, struct sched_gwrr_entity, run_list);
 	list_del_init(queue);
-	list_add_tail(queue,gse);
+	list_add_tail(&gse->run_list,queue);
 	
 }
 
@@ -164,13 +165,15 @@ const struct sched_class gwrr_sched_class = {
 /*
  * The two system calls used to update group weights...
  */
-asmlinkage int getgroupweight(int gid)
+asmlinkage int sys_getgroupweight(int gid)
 {
+	printk("getgroupweight called with gid %d\n",gid);
 	return 0;
 }
 
-asmlinkage int setgroupweight(int gid, int weight)
+asmlinkage int sys_setgroupweight(int gid, int weight)
 {
+	printk("setgroupweight called with gid %d, weight %d\n",gid,weight);
 	return 0;
 }
 

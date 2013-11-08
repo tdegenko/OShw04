@@ -332,6 +332,10 @@
 #define __NR_fallocate		324
 #define __NR_timerfd_settime	325
 #define __NR_timerfd_gettime	326
+/* Added for GWRR scheduling */
+#define __NR_getgroupweight	327
+#define __NR_setgroupweight	328
+
 
 #ifdef __KERNEL__
 
