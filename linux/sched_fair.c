@@ -1515,7 +1515,8 @@ static void moved_group_fair(struct task_struct *p)
  * All the scheduling class methods:
  */
 static const struct sched_class fair_sched_class = {
-	.next			= &idle_sched_class,
+	/* MODIFIED FOR GWRR SCHEDULING !! */
+	.next			= &gwrr_sched_class,
 	.enqueue_task		= enqueue_task_fair,
 	.dequeue_task		= dequeue_task_fair,
 	.yield_task		= yield_task_fair,

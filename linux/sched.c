@@ -1493,6 +1493,10 @@ static void cfs_rq_set_shares(struct cfs_rq *cfs_rq, unsigned long shares)
 
 #include "sched_stats.h"
 #include "sched_idletask.c"
+
+/* added for GWRR scheduling: */
+#include "sched_gwrr.c"
+
 #include "sched_fair.c"
 #include "sched_rt.c"
 #ifdef CONFIG_SCHED_DEBUG
@@ -4735,7 +4739,13 @@ __setscheduler(struct rq *rq, struct task_struct *p, int policy, int prio)
 	case SCHED_RR:
 		p->sched_class = &rt_sched_class;
 		break;
+	/* Added for GWRR scheduling: */
+	case SCHED_GWRR:
+		p->sched_class = &gwrr_sched_class;
+		break;
 	}
+
+	/* GWRR TODO: Priority settings... */	
 
 	p->rt_priority = prio;
 	p->normal_prio = normal_prio(p);
@@ -4752,6 +4762,9 @@ __setscheduler(struct rq *rq, struct task_struct *p, int policy, int prio)
  *
  * NOTE that the task may be already dead.
  */
+
+/* MODIFIED FOR GWRR SCHEDULING !! TODO: any further changes necessary? */
+
 int sched_setscheduler(struct task_struct *p, int policy,
 		       struct sched_param *param)
 {
@@ -4768,7 +4781,7 @@ recheck:
 		policy = oldpolicy = p->policy;
 	else if (policy != SCHED_FIFO && policy != SCHED_RR &&
 			policy != SCHED_NORMAL && policy != SCHED_BATCH &&
-			policy != SCHED_IDLE)
+			&& policy != SCHED_GWRR && policy != SCHED_IDLE)
 		return -EINVAL;
 	/*
 	 * Valid priorities for SCHED_FIFO and SCHED_RR are
