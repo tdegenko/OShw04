@@ -326,3 +326,5 @@ ENTRY(sys_call_table)
 	.long sys_fallocate
 	.long sys_timerfd_settime	/* 325 */
 	.long sys_timerfd_gettime
+	.long sys_getgroupweight	/* 327 - for GWRR scheduling */
+	.long sys_setgroupweight	/* 328 - implementation... */

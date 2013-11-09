@@ -1,12 +1,9 @@
 /*
- * cs2456/sched.c:
+ * linux/sched_gwrr.c:
  * 	Group-Weighted Round Robin scheduling class.
  *
- * First, null-functionality iteration, borrowing tentatively from sched_rt.c
+ * First, quasi-functional iteration, borrowing tentatively from sched_rt.c
  */
-
-#include <linux/sched.h>
-
 
 /* We don't know yet... */
 /* 
@@ -17,20 +14,8 @@ static struct list_head group_queues[NUM_GROUPS];
 /* Will need initialization... in sched_init? */
 static struct list_head one_queue;
 
-/* Whose turn is it? */
+/* Whose turn is it? Or can we do this better? */
 /*static int cur_group = 0;*/
-
-/* A scheduling entity for a GWRR task */
-static struct sched_gwrr_entity {
-	/* g_s_e main linked list element */
-	struct list_head run_list;
-	
-	/* timing */
-	u64 starttime;
-	u64 runtime;
-	/* Link to original runqueue... */
-	struct rq* rq;
-}
 
 static void check_preempt_curr_gwrr(struct rq *rq, struct task_struct *p)
 {

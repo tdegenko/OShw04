@@ -1,1 +1,1 @@
-obj-y := sched.o
+#obj-y := sched.o
