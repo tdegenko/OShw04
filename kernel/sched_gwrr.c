@@ -17,6 +17,26 @@ static LIST_HEAD(one_queue);
 /* Whose turn is it? Or can we do this better? */
 /*static int cur_group = 0;*/
 
+/* Necessary?? */
+#ifdef CONFIG_SMP
+static int select_task_rq_gwrr(struct task_struct *p, int sync)
+{
+	/* 
+ 	 * We're not bothering with moving GWRR tasks between
+ 	 * CPUs, so we can just return the CPU it's currently on
+ 	 */
+	return task_cpu(p);
+}
+static void set_cpus_allowed_gwrr(struct task_struct *p, cpumask_t *new_mask)
+{
+	/*
+	 * Do we need to do something here to avoid CPU switching?
+ 	 * In fact, do we need to restrict the task explicitly to
+ 	 *  a single CPU?
+ 	 */ 
+}
+#endif 
+
 static void check_preempt_curr_gwrr(struct rq *rq, struct task_struct *p)
 {
 	/* GWRR has lowest priority - ALWAYS preempt! */
@@ -24,6 +44,52 @@ static void check_preempt_curr_gwrr(struct rq *rq, struct task_struct *p)
 	resched_task(rq->curr);
 }
  
+
+static void enqueue_task_gwrr(struct rq *rq, struct task_struct *p, int wakeup)
+{
+	struct sched_gwrr_entity *new;
+	struct list_head *queue;
+
+	queue = &one_queue;
+
+	new = &p->gwrr_se;
+	/* add before the head of the queue - effectively
+ 	 * putting the new task at the end of the queue! */ 
+	list_add_tail(&new->run_list,queue);
+
+	/* Handle wakeup... */	
+}
+
+static void dequeue_task_gwrr(struct rq *rq, struct task_struct *p, int sleep)
+{
+	struct sched_gwrr_entity *sge;
+
+ 	/* delete the current sched entity from the queue */
+	sge = &rq->curr->gwrr_se;
+ 
+	list_del_init(&sge->run_list);
+
+	/* Handle sleep... */
+}
+
+static void yield_task_gwrr(struct rq *rq)
+{
+	struct sched_gwrr_entity *sge;
+	struct list_head *queue;
+
+	/*
+	 * rq->curr is the currently running GWRR task 
+	 * (GWRR because the kernel called this function!)
+	 */
+	sge = &rq->curr->gwrr_se;
+	queue = &one_queue;
+
+	/* Move task back to end of queue. */
+	list_del_init(&sge->run_list);
+	list_add_tail(&sge->run_list,queue);
+	
+}
+
 static struct task_struct *pick_next_task_gwrr(struct rq *rq)
 {
 	/*struct list_head queue = group_queues[cur_group];*/
@@ -50,80 +116,64 @@ static struct task_struct *pick_next_task_gwrr(struct rq *rq)
 
 	/* Find task struct from gwrr sched entity */
 	p = container_of(next, struct task_struct, gwrr_se);
-	/* note start time */
-	next->starttime = rq->clock;
-	/* Hmmmm.... */
+	/* note start time - necessary? */
+	p->se.exec_start = rq->clock;
 	return p; 
-}
-
-static void enqueue_task_gwrr(struct rq *rq, struct task_struct *p, int wakeup)
-{
-	struct sched_gwrr_entity *new;
-	struct list_head *queue;
-
-	queue = &one_queue;
-
-	new = &p->gwrr_se;
-	/* add before the head of the queue - effectively
- 	 * putting the new task at the end of the queue! */ 
-	list_add_tail(&new->run_list,queue);
-
-	/* Handle wakeup... */	
-}
-
-static void dequeue_task_gwrr(struct rq *rq, struct task_struct *p, int sleep)
-{
-	struct list_head *queue;
-
-	queue = &one_queue;
-
- 	/* delete the current head of the queue */ 
-	list_del_init(queue);
-
-	/* Handle sleep... */
-}
-
-static void yield_task_gwrr(struct rq *rq)
-{
-	struct sched_gwrr_entity *gse;
-	struct list_head *queue;
-
-	queue = &one_queue;
-
-	/* Move task back to end of queue */
-	gse = list_entry(queue, struct sched_gwrr_entity, run_list);
-	list_del_init(queue);
-	list_add_tail(&gse->run_list,queue);
-	
 }
 
 static void put_prev_task_gwrr(struct rq *rq, struct task_struct *p)
 {
-	/* reset previous task? */
-	p->gwrr_se.starttime = 0;
+	/* reset start time as for all schedulers - necessary */
+	p->se.exec_start = 0;
 }
 
 static void task_new_gwrr(struct rq *rq, struct task_struct *p)
 {
-	/* Give new task's sched_gwrr_entity a link to the run-queue
+	
+	/* 
+	 * Give new task's sched_gwrr_entity a link to the run-queue
  	 * it is on. The task will remain on the same processor and
  	 * we need to make sure that we don't attempt to run it on
  	 * any other processor; we use the runqueue to determine
  	 * which processor is running this task in pick_next_task
  	 */
 	p->gwrr_se.rq = rq;
+
+	/* Initialize counter with default timeslice */
+	p->gwrr_se.time_slice = DEF_TIMESLICE;
 }
 
-static void task_tick_gwrr(struct rq *rq, struct task_struct *curr, int queued)
+static void task_tick_gwrr(struct rq *rq, struct task_struct *p, int queued)
 {
-	/* We need to update the timing info in here... 
- 	 * currently this is doing nothing. :| */
+	struct sched_gwrr_entity *sge;
+	struct list_head *queue;
+
+	/* On every kernel timer tick, decrement counter */
+	sge = &p->gwrr_se;
+	sge->time_slice--;
+
+	if (sge->time_slice > 0) return;
+
+	/* Timeslice exhausted, refill counter... */
+	sge->time_slice = DEF_TIMESLICE;
+
+ 	/* ... and roll to end of queue and request reschedule
+ 		 if others are waiting */
+	if (sge->run_list.prev != sge->run_list.next) {	
+
+		list_del_init(&sge->run_list);
+		list_add_tail(&sge->run_list,queue);
+
+		set_tsk_need_resched(p);		
+	}
+
 }
 
 static void set_curr_task_gwrr(struct rq *rq)
 {
 	/* Seems to be used for updating priorities, but there's
- 	 * not much point in that for GWRR... */ 
+ 	 * not much point in that for GWRR... is there? */ 
+	rq->curr->se.exec_start = rq->clock;
 }
 
 static void switched_to_gwrr(struct rq *rq, struct task_struct *p,

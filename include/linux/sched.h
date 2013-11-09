@@ -1030,9 +1030,8 @@ struct sched_gwrr_entity {
         struct list_head run_list;
 
         /* timing... */
-        u64 starttime;
-        u64 runtime;
-        /* link back to original runqueue */
+        unsigned int time_slice;
+	/* link back to original runqueue */
         struct rq* rq;
 };
 
