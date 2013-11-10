@@ -10,9 +10,20 @@
 #define NUM_GROUPS 1
 static struct list_head group_queues[NUM_GROUPS];
  */
+#include <linux/sched.h>
+#define GWRR_PRIO 15
+
+/* Group Structure */
+struct gwrr_group {
+    struct list_head groups;
+    int priority;
+    gid_t gid;
+    struct list_head queue;
+};
 
 /* Will need initialization... in sched_init? */
-static LIST_HEAD(one_queue);
+/* Initialize group list */
+static LIST_HEAD(group_queue);
 
 /* Whose turn is it? Or can we do this better? */
 /*static int cur_group = 0;*/
@@ -44,14 +55,33 @@ static void check_preempt_curr_gwrr(struct rq *rq, struct task_struct *p)
 //	printk("Preempting GWRR task...");
 	resched_task(rq->curr);
 }
- 
+
+struct gwrr_group * get_group(gid_t gid){
+  
+  struct gwrr_group * pos;
+
+  list_for_each_entry(pos, &group_queue, groups){
+    if(pos->gid == gid){
+      return pos;
+    }
+  }
+  return (struct event *) NULL;
+}
 
 static void enqueue_task_gwrr(struct rq *rq, struct task_struct *p, int wakeup)
 {
 	struct sched_gwrr_entity *new;
 	struct list_head *queue;
 printk("Enqueuing new GWRR task %s\n",p->comm);
-	queue = &one_queue;
+    gid_t gid= p->gid;
+    struct gwrr_group * group=get_group(gid);
+    if(group==NULL){
+        group=kmalloc(sizeof(struct gwrr_group), GFP_KERNEL);
+        group->gid=gid;
+        group->priority=GWRR_PRIO;
+        group->queue=(struct list_head)LIST_HEAD_INIT(group->queue);
+    }
+	queue = &(group->queue);
 
 	new = &p->gwrr_se;
 	/* add before the head of the queue - effectively
@@ -83,7 +113,7 @@ printk("Yielding from GWRR task\n");
 	 * (GWRR because the kernel called this function!)
 	 */
 	sge = &rq->curr->gwrr_se;
-	queue = &one_queue;
+	queue = &group_queue;
 
 	/* Move task back to end of queue. */
 	list_del_init(&sge->run_list);
@@ -98,7 +128,7 @@ static struct task_struct *pick_next_task_gwrr(struct rq *rq)
 	struct sched_gwrr_entity *next;
 	struct task_struct *p;
 
-	queue = &one_queue;
+	queue = &group_queue;
 
 	/* Check for empty queue. */
 	if (list_empty(queue)) {
