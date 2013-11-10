@@ -11,12 +11,12 @@
 static struct list_head group_queues[NUM_GROUPS];
  */
 #include <linux/sched.h>
-#define GWRR_PRIO 15
+#define GWRR_WEIGHT 15
 
 /* Group Structure */
 struct gwrr_group {
     struct list_head groups;
-    int priority;
+    int weight,used;
     gid_t gid;
     struct list_head queue;
 };
@@ -26,7 +26,8 @@ struct gwrr_group {
 static LIST_HEAD(group_queue);
 
 /* Whose turn is it? Or can we do this better? */
-/*static int cur_group = 0;*/
+/* we're going to do it this way for now */
+static gid_t cur_group = 0;
 
 /* Necessary?? */
 #ifdef CONFIG_SMP
@@ -78,8 +79,10 @@ printk("Enqueuing new GWRR task %s\n",p->comm);
     if(group==NULL){
         group=kmalloc(sizeof(struct gwrr_group), GFP_KERNEL);
         group->gid=gid;
-        group->priority=GWRR_PRIO;
+        group->weight=GWRR_WEIGHT;
+        group->used=0;
         group->queue=(struct list_head)LIST_HEAD_INIT(group->queue);
+        list_add_tail(group,&group_queue);
     }
 	queue = &(group->queue);
 
@@ -112,8 +115,10 @@ printk("Yielding from GWRR task\n");
 	 * rq->curr is the currently running GWRR task 
 	 * (GWRR because the kernel called this function!)
 	 */
+    gid_t gid= rq->curr->gid;
+    struct gwrr_group * group=get_group(gid);
 	sge = &rq->curr->gwrr_se;
-	queue = &group_queue;
+	queue = &(group->queue);
 
 	/* Move task back to end of queue. */
 	list_del_init(&sge->run_list);
@@ -127,8 +132,33 @@ static struct task_struct *pick_next_task_gwrr(struct rq *rq)
 	struct list_head *queue;
 	struct sched_gwrr_entity *next;
 	struct task_struct *p;
+    struct gwrr_group * group;
+	queue = NULL;
+    if(group_queue.next==group_queue.prev){
+        return NULL;
+    }else if(cur_group!=0){
+        group=get_group(cur_group);
+        if(group==NULL){
+            /* current group does not exist */
+            queue=&list_first_entry(group_queue.next,struct gwrr_group,groups)->queue;
+        }else if(group->used >= group->weight){
+            /* current group has used all it's time */
+            group->used=0;
+            group=list_entry(group,struct gwrr_group,groups);
+            cur_group=group->gid;
+            queue=&group->queue;
+        }else{
+            /* current group has time left */
+            group->used++;
+            queue=&group->queue;
+        }
+    }else{
+        /* current group has not been set yet*/
+        group=list_first_entry(group_queue.next,struct gwrr_group,groups);
+        cur_group=group->gid;
+        queue=&group->queue;
+    }
 
-	queue = &group_queue;
 
 	/* Check for empty queue. */
 	if (list_empty(queue)) {
