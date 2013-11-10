@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <linux/unistd.h>
-#include <linux/pid.h>
+#include <linux/sched.h>
 #include <sys/syscall.h>
 #include <sched.h>
 
@@ -46,65 +46,64 @@ int main(int argc, char *argv[]){
     setgroupweight(MJGID,30);
     setgroupweight(SJGID,10);
     setgroupweight(PGID,10);
-    printf("Group weights set to:\nM/J:\t%d\nS\J:\t%d\nP:\t%d\n", getgroupweight(MJID),getgroupid(SJGID),getgroupweight(pgid));
+    printf("Group weights set to:\nM/J:\t%d\nS/J:\t%d\nP:\t%d\n", getgroupweight(MJGID),getgroupweight(SJGID),getgroupweight(PGID));
 
     //Get unitial runtimes.
     int mitime,jaitime,sitime,jiitime,pitime;
-    mitime  = task_sched_runtime(get_pid_task(find_get_pid(marrypid), PIDTYPE_PID));
-    jaitime = task_sched_runtime(get_pid_task(find_get_pid(janepid),  PIDTYPE_PID));
-    sitime  = task_sched_runtime(get_pid_task(find_get_pid(sampid),   PIDTYPE_PID));
-    jiitime = task_sched_runtime(get_pid_task(find_get_pid(jimpid),   PIDTYPE_PID));
-    pitime  = task_sched_runtime(get_pid_task(find_get_pid(patpid),   PIDTYPE_PID));
+    mitime  = task_sched_runtime(find_task_by_pid(marrypid));
+    jaitime = task_sched_runtime(find_task_by_pid(janepid));
+    sitime  = task_sched_runtime(find_task_by_pid(sampid));
+    jiitime = task_sched_runtime(find_task_by_pid(jimpid));
+    pitime  = task_sched_runtime(find_task_by_pid(patpid));
     //sleep to let scheduler do it's thing and schedule
-    sleep(1)
+    sleep(1);
     //upon wakeup get new times.
     int metime,jaetime,setime,jietime,petime;
-    metime  = task_sched_runtime(get_pid_task(marrypid, PIDTYPE_PID));
-    jaetime = task_sched_runtime(get_pid_task(janepid,  PIDTYPE_PID));
-    setime  = task_sched_runtime(get_pid_task(sampid,   PIDTYPE_PID));
-    jietime = task_sched_runtime(get_pid_task(jimpid,   PIDTYPE_PID));
-    petime  = task_sched_runtime(get_pid_task(patpid,   PIDTYPE_PID));
+    metime  = task_sched_runtime(find_task_by_pid(marrypid));
+    jaetime = task_sched_runtime(find_task_by_pid(janepid));
+    setime  = task_sched_runtime(find_task_by_pid(sampid));
+    jietime = task_sched_runtime(find_task_by_pid(jimpid));
+    petime  = task_sched_runtime(find_task_by_pid(patpid));
     //calculate time spent in each group:
     int mjtime=(metime-mitime)+(jaetime-jaitime);
     int sjtime=(setime-sitime)+(jietime-jiitime);
     int ptime=(ptime-ptime);
 
-    printf("Marry/Jane:\t%d\nSam/Jim:\t%d\nPat:\t%d",mjtime,sjtime,ptime)
+    printf("Marry/Jane:\t%d\nSam/Jim:\t%d\nPat:\t%d",mjtime,sjtime,ptime);
     int cpid=fork();
+    int wait=1000;
     switch(cpid){
         case 0:
             //child stuff.
             //sched_setscheduler(getpid(),SCHED_NORMAL,NULL);
-            int i=1000;
-            while(i>0){
-                i--;
+            while(wait>0){
+                wait--;
             }
-            exit 0;
         case -1:
             //Error Stuff
-            exit(-1);
+            return 1;
         default:
             //Parrent stuff
             //Get unitial runtimes.
-            mitime  = task_sched_runtime(get_pid_task(marrypid, PIDTYPE_PID));
-            jaitime = task_sched_runtime(get_pid_task(janepid,  PIDTYPE_PID));
-            sitime  = task_sched_runtime(get_pid_task(sampid,   PIDTYPE_PID));
-            jiitime = task_sched_runtime(get_pid_task(jimpid,   PIDTYPE_PID));
-            pitime  = task_sched_runtime(get_pid_task(patpid,   PIDTYPE_PID));
+            mitime  = task_sched_runtime(find_task_by_pid(marrypid));
+            jaitime = task_sched_runtime(find_task_by_pidd(janepid));
+            sitime  = task_sched_runtime(find_task_by_pid(sampid));
+            jiitime = task_sched_runtime(find_task_by_pid(jimpid));
+            pitime  = task_sched_runtime(find_task_by_pid(patpid));
             //wait to let scheduler do it's thing and schedule
-            waitpid(cpid,null,1);
+            waitpid(cpid,NULL,1);
             //Get times run.
-            metime  = task_sched_runtime(get_pid_task(marrypid, PIDTYPE_PID));
-            jaetime = task_sched_runtime(get_pid_task(janepid,  PIDTYPE_PID));
-            setime  = task_sched_runtime(get_pid_task(sampid,   PIDTYPE_PID));
-            jietime = task_sched_runtime(get_pid_task(jimpid,   PIDTYPE_PID));
-            petime  = task_sched_runtime(get_pid_task(patpid,   PIDTYPE_PID));
+            metime  = task_sched_runtime(find_task_by_pid(marrypid));
+            jaetime = task_sched_runtime(find_task_by_pid(janepid));
+            setime  = task_sched_runtime(find_task_by_pid(sampid));
+            jietime = task_sched_runtime(find_task_by_pid(jimpid));
+            petime  = task_sched_runtime(find_task_by_pid(patpid));
             //calculate time spent in each group:
             mjtime=(metime-mitime)+(jaetime-jaitime);
             sjtime=(setime-sitime)+(jietime-jiitime);
             ptime=(ptime-ptime);
 
-            printf("Marry/Jane:\t%d\nSam/Jim:\t%d\nPat:\t%d",mjtime,sjtime,ptime)
+            printf("Marry/Jane:\t%d\nSam/Jim:\t%d\nPat:\t%d",mjtime,sjtime,ptime);
 
  
     }
