@@ -41,6 +41,7 @@ static void check_preempt_curr_gwrr(struct rq *rq, struct task_struct *p)
 {
 	/* GWRR has lowest priority - ALWAYS preempt! */
 	/* Do we need to update the timing info here?? */
+//	printk("Preempting GWRR task...");
 	resched_task(rq->curr);
 }
  
@@ -49,14 +50,14 @@ static void enqueue_task_gwrr(struct rq *rq, struct task_struct *p, int wakeup)
 {
 	struct sched_gwrr_entity *new;
 	struct list_head *queue;
-
+printk("Enqueuing new GWRR task %s\n",p->comm);
 	queue = &one_queue;
 
 	new = &p->gwrr_se;
 	/* add before the head of the queue - effectively
  	 * putting the new task at the end of the queue! */ 
 	list_add_tail(&new->run_list,queue);
-
+printk("Done enqueuing\n");
 	/* Handle wakeup... */	
 }
 
@@ -76,7 +77,7 @@ static void yield_task_gwrr(struct rq *rq)
 {
 	struct sched_gwrr_entity *sge;
 	struct list_head *queue;
-
+printk("Yielding from GWRR task\n");
 	/*
 	 * rq->curr is the currently running GWRR task 
 	 * (GWRR because the kernel called this function!)
@@ -87,7 +88,7 @@ static void yield_task_gwrr(struct rq *rq)
 	/* Move task back to end of queue. */
 	list_del_init(&sge->run_list);
 	list_add_tail(&sge->run_list,queue);
-	
+printk("Done yielding\n");
 }
 
 static struct task_struct *pick_next_task_gwrr(struct rq *rq)
@@ -104,18 +105,28 @@ static struct task_struct *pick_next_task_gwrr(struct rq *rq)
 		return NULL; /* no GWRR tasks left! */
 	}
 
-	/* Select next sched entitiy in the RR queue */
+	/* Select next sched entity in the RR queue */
 	next = list_entry(queue->next, struct sched_gwrr_entity, run_list);
 	
-	/* Don't run this if we're called from the wrong CPU */
-	if (next->rq != rq) {
-		return NULL;
-	}
-	
-	printk("GWRR checked, task found!\n");
-
 	/* Find task struct from gwrr sched entity */
 	p = container_of(next, struct task_struct, gwrr_se);
+
+#ifdef CONFIG_SMP
+	/* 
+ 	 * If we're at this point, we have a GWRR task that wants
+ 	 * running. However, since GWRR is CPU-independent, this task
+ 	 * may not be on the runqueue that pick_next_task was called from.
+ 	 * Therefore, if we're called from a different CPU than the one
+ 	 * the task is running from, we don't have any GWRR tasks for this
+ 	 * runqueue. (Logical assumption: rq ~ CPU.) 
+	 */
+	if (task_cpu(p) != smp_processor_id()) {
+		return NULL;
+	}
+#endif
+
+	printk("GWRR checked, task found!\n");
+	
 	/* note start time - necessary? */
 	p->se.exec_start = rq->clock;
 	return p; 
@@ -141,6 +152,8 @@ static void task_new_gwrr(struct rq *rq, struct task_struct *p)
 
 	/* Initialize counter with default timeslice */
 	p->gwrr_se.time_slice = DEF_TIMESLICE;
+
+printk("New GWRR task created?\n");
 }
 
 static void task_tick_gwrr(struct rq *rq, struct task_struct *p, int queued)
@@ -151,9 +164,10 @@ static void task_tick_gwrr(struct rq *rq, struct task_struct *p, int queued)
 	/* On every kernel timer tick, decrement counter */
 	sge = &p->gwrr_se;
 	sge->time_slice--;
-
+if (sge->time_slice < 0) printk("PANIC: We broke the timer!\n");
+else printk("Tick: New ts: %d\n",sge->time_slice);
 	if (sge->time_slice > 0) return;
-
+printk("Timeslice exhausted, refilling...\n");
 	/* Timeslice exhausted, refill counter... */
 	sge->time_slice = DEF_TIMESLICE;
 
@@ -174,6 +188,10 @@ static void set_curr_task_gwrr(struct rq *rq)
 	/* Seems to be used for updating priorities, but there's
  	 * not much point in that for GWRR... is there? */ 
 	rq->curr->se.exec_start = rq->clock;
+	/* Or maybe there is... if our task is changed to GWRR
+	 * scheduling, we need to start it with a full time slice! */
+	rq->curr->gwrr_se.time_slice = DEF_TIMESLICE;
+	printk("Curr ts: %d\n",rq->curr->gwrr_se.time_slice);
 }
 
 static void switched_to_gwrr(struct rq *rq, struct task_struct *p,
