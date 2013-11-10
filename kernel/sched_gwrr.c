@@ -2,7 +2,7 @@
  * linux/sched_gwrr.c:
  * 	Group-Weighted Round Robin scheduling class.
  *
- * First, quasi-functional iteration, borrowing tentatively from sched_rt.c
+ * Functional(?) groupless RR scheduler, derived from sched_rt.c
  */
 
 /* We don't know yet... */
