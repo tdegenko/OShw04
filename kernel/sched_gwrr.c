@@ -11,7 +11,7 @@
 static struct list_head group_queues[NUM_GROUPS];
  */
 #include <linux/sched.h>
-#define GWRR_WEIGHT 15
+#define GWRR_WEIGHT 10
 
 /* Group Structure */
 struct gwrr_group {
@@ -296,12 +296,21 @@ const struct sched_class gwrr_sched_class = {
 asmlinkage int sys_getgroupweight(int gid)
 {
 	printk("getgroupweight called with gid %d\n",gid);
-	return 0;
+    struct gwrr_group * group = get_group(gid);
+    if(group==NULL){
+        return -1;
+    }
+	return group->weight;
 }
 
 asmlinkage int sys_setgroupweight(int gid, int weight)
 {
 	printk("setgroupweight called with gid %d, weight %d\n",gid,weight);
+    struct gwrr_group * group = get_group(gid);
+    if(group==NULL){
+        return -1;
+    }
+    group->weight=weight;
 	return 0;
 }
 
