@@ -46,14 +46,15 @@ int main(int argc, char *argv[]){
     setgroupweight(MJGID,30);
     setgroupweight(SJGID,10);
     setgroupweight(PGID,10);
+    printf("Group weights set to:\nM/J:\t%d\nS\J:\t%d\nP:\t%d\n", getgroupweight(MJID),getgroupid(SJGID),getgroupweight(pgid));
 
     //Get unitial runtimes.
     int mitime,jaitime,sitime,jiitime,pitime;
-    mitime  = task_sched_runtime(get_pid_task(marrypid, PIDTYPE_PID));
-    jaitime = task_sched_runtime(get_pid_task(janepid,  PIDTYPE_PID));
-    sitime  = task_sched_runtime(get_pid_task(sampid,   PIDTYPE_PID));
-    jiitime = task_sched_runtime(get_pid_task(jimpid,   PIDTYPE_PID));
-    pitime  = task_sched_runtime(get_pid_task(patpid,   PIDTYPE_PID));
+    mitime  = task_sched_runtime(get_pid_task(find_get_pid(marrypid), PIDTYPE_PID));
+    jaitime = task_sched_runtime(get_pid_task(find_get_pid(janepid),  PIDTYPE_PID));
+    sitime  = task_sched_runtime(get_pid_task(find_get_pid(sampid),   PIDTYPE_PID));
+    jiitime = task_sched_runtime(get_pid_task(find_get_pid(jimpid),   PIDTYPE_PID));
+    pitime  = task_sched_runtime(get_pid_task(find_get_pid(patpid),   PIDTYPE_PID));
     //sleep to let scheduler do it's thing and schedule
     sleep(1)
     //upon wakeup get new times.
@@ -73,7 +74,11 @@ int main(int argc, char *argv[]){
     switch(cpid){
         case 0:
             //child stuff.
-            sched_setscheduler(getpid(),SCHED_NORMAL,NULL);
+            //sched_setscheduler(getpid(),SCHED_NORMAL,NULL);
+            int i=1000;
+            while(i>0){
+                i--;
+            }
             exit 0;
         case -1:
             //Error Stuff
