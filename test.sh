@@ -1,102 +1,97 @@
 #!/bin/bash
-su Marry
-./test&
-$!>>marry_pid
-exit
-su Jane
-./test&
-$!>>jane_pid
-exit
-su Sam
-./test&
-$!>>sam_pid
-exit
-su Jim
-./test&
-$!>>jim_pid
-exit
-su Pat
-./test&
-$!>>pat_pid
-exit
+echo "MARY:"
+su -c "./usertest.sh" -m Mary
+echo "JANE:"
+su -c "./usertest.sh" -m Jane
+echo "SAM:"
+su -c "./usertest.sh" -m Sam
+echo "JIM:"
+su -c "./usertest.sh" -m Jim
+echo "PAT:"
+su -c "./usertest.sh" -m Pat
 
-export marrypid=$(cat marry_pid)
-export janepid=$(cat jane_pid)
-export sampid=$(cat sam_pid)
-export jimpid=$(cat jim_pid)
-export patpid=$(cat pat_pid)
+./changeweight
+
+echo "CS2456:"
+
+export mary_pid=$(cat Mary_pid)
+export jane_pid=$(cat Jane_pid)
+export sam_pid=$(cat Sam_pid)
+export jim_pid=$(cat Jim_pid)
+export pat_pid=$(cat Pat_pid)
 
 echo "===================================================\n"
-     "=             testing time allocation             ="
-     "==================================================="
+echo "=             testing time allocation             ="
+echo "==================================================="
 echo "BEFORE SLEEP"
 
-echo "MARRY:"
-cat /proc/$marry_pid/sched
+echo "MARY:"
+ps -p $mary_pid -o etime=
 echo "JANE:"
-cat /proc/$jane_pid/sched
+ps -p $jane_pid -o etime=
 echo "SAM:"
-cat /proc/$sam_pid/sched
+ps -p $sam_pid -o etime=
 echo "JIM:"
-cat /proc/$jim_pid/sched
+ps -p $jim_pid -o etime=
 echo "PAT:"
-cat /proc/$pat_pid/sched
+ps -p $pat_pid -o etime=
 echo "SLEEPING"
-sleep 2
+sleep 10
 
 echo "AFTER SLEEP"
 
-echo "MARRY:"
-cat /proc/$marry_pid/sched
+echo "MARY:"
+ps -p $mary_pid -o etime=
 echo "JANE:"
-cat /proc/$jane_pid/sched
+ps -p $jane_pid -o etime=
 echo "SAM:"
-cat /proc/$sam_pid/sched
+ps -p $sam_pid -o etime=
 echo "JIM:"
-cat /proc/$jim_pid/sched
+ps -p $jim_pid -o etime=
 echo "PAT:"
-cat /proc/$pat_pid/sched
+ps -p $pat_pid -o etime=
 
-echo "===================================================\n"
-     "=         removing and adding proccess            ="
-     "==================================================="
-echo "Killing Marry's proccess (and starting an new one)."
-su Marry
-./test&
-killall -9 test
-$!>>marry_pid
-exit
+#echo "===================================================\n"
+#     "=         removing and adding proccess            ="
+#     "==================================================="
+#echo "Killing Marry's proccess (and starting an new one)."
+#su Marry
+#su -c "./usertest.sh" -m Mary./test&
+#killall -9 test
+#$!>>mary_pid
+#exit
+#
+#echo "===================================================\n"
+#echo "=                 Testing preemption              ="
+#echo "==================================================="
+#echo "BEFORE BUSSY WAIT"
+#
+#echo "MARY:"
+#ps -p $mary_pid -o etime=
+#echo "JANE:"
+#ps -p $jane_pid -o etime=
+#echo "SAM:"
+#ps -p $sam_pid -o etime=
+#echo "JIM:"
+#ps -p $jim_pid -o etime=
+#echo "PAT:"
+#ps -p $pat_pid -o etime=
+#echo "Running"
+#TIME=$(date +%S)
+#while [[ $TIME -eq $(date +%S) ]]; do
+#done
+#
+#echo "After running"
+#
+#echo "MARY:"
+#ps -p $mary_pid -o etime=
+#echo "JANE:"
+#ps -p $jane_pid -o etime=
+#echo "SAM:"
+#ps -p $sam_pid -o etime=
+#echo "JIM:"
+#ps -p $jim_pid -o etime=
+#echo "PAT:"
+#ps -p $pat_pid -o etime=
+#
 
-echo "===================================================\n"
-     "=                 Testing preemption              ="
-     "==================================================="
-echo "BEFORE BUSSY WAIT"
-
-echo "MARRY:"
-cat /proc/$marry_pid/sched
-echo "JANE:"
-cat /proc/$jane_pid/sched
-echo "SAM:"
-cat /proc/$sam_pid/sched
-echo "JIM:"
-cat /proc/$jim_pid/sched
-echo "PAT:"
-cat /proc/$pat_pid/sched
-echo "Running"
-TIME=$(date +%S)
-while [[ $TIME -eq $(date +%S) ]]; do
-done
-
-echo "After running"
-
-echo "MARRY:"
-cat /proc/$marry_pid/sched
-echo "JANE:"
-cat /proc/$jane_pid/sched
-echo "SAM:"
-cat /proc/$sam_pid/sched
-echo "JIM:"
-cat /proc/$jim_pid/sched
-echo "PAT:"
-cat /proc/$pat_pid/sched
-echo "SLEEPING"

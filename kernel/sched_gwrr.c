@@ -51,6 +51,7 @@ static void set_cpus_allowed_gwrr(struct task_struct *p, cpumask_t *new_mask)
 
 static void check_preempt_curr_gwrr(struct rq *rq, struct task_struct *p)
 {
+    printk("pre-empting task\n");
 	/* GWRR has lowest priority - ALWAYS preempt! */
 	/* Do we need to update the timing info here?? */
 //	printk("Preempting GWRR task...");
@@ -73,7 +74,7 @@ static void enqueue_task_gwrr(struct rq *rq, struct task_struct *p, int wakeup)
 {
 	struct sched_gwrr_entity *new;
 	struct list_head *queue;
-printk("Enqueuing new GWRR task %s\n",p->comm);
+    printk("Enqueuing new GWRR task %s\n",p->comm);
     gid_t gid= p->gid;
     struct gwrr_group * group=get_group(gid);
     if(group==NULL){
@@ -83,6 +84,7 @@ printk("Enqueuing new GWRR task %s\n",p->comm);
         group->used=0;
         group->queue=(struct list_head)LIST_HEAD_INIT(group->queue);
         list_add_tail(group,&group_queue);
+        printk("added new group for %d\n",gid);
     }
 	queue = &(group->queue);
 
@@ -158,7 +160,7 @@ static struct task_struct *pick_next_task_gwrr(struct rq *rq)
         cur_group=group->gid;
         queue=&group->queue;
     }
-
+    printk("cur_group:\t%d\b",cur_group);
 
 	/* Check for empty queue. */
 	if (list_empty(queue)) {
@@ -257,6 +259,7 @@ static void set_curr_task_gwrr(struct rq *rq)
 static void switched_to_gwrr(struct rq *rq, struct task_struct *p,
                              int running)
 {
+	printk("Switched to gwrr\n");
 	/* Necessary? */
 }
 
@@ -298,6 +301,7 @@ asmlinkage int sys_getgroupweight(int gid)
 	printk("getgroupweight called with gid %d\n",gid);
     struct gwrr_group * group = get_group(gid);
     if(group==NULL){
+        printk("group not found\n");
         return -1;
     }
 	return group->weight;
@@ -308,6 +312,7 @@ asmlinkage int sys_setgroupweight(int gid, int weight)
 	printk("setgroupweight called with gid %d, weight %d\n",gid,weight);
     struct gwrr_group * group = get_group(gid);
     if(group==NULL){
+        printk("group not found\n");
         return -1;
     }
     group->weight=weight;
