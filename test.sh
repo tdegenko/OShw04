@@ -20,40 +20,40 @@ export sam_pid=$(cat Sam_pid)
 export jim_pid=$(cat Jim_pid)
 export pat_pid=$(cat Pat_pid)
 
-echo "===================================================\n"
+echo "==========================\n"
 echo "=             testing time allocation             ="
-echo "==================================================="
+echo "=========================="
 echo "BEFORE SLEEP"
 
 echo "MARY:"
-ps -p $mary_pid -o etime=
+ps -p $mary_pid -o cputime=
 echo "JANE:"
-ps -p $jane_pid -o etime=
+ps -p $jane_pid -o cputime=
 echo "SAM:"
-ps -p $sam_pid -o etime=
+ps -p $sam_pid -o cputime=
 echo "JIM:"
-ps -p $jim_pid -o etime=
+ps -p $jim_pid -o cputime=
 echo "PAT:"
-ps -p $pat_pid -o etime=
+ps -p $pat_pid -o cputime=
 echo "SLEEPING"
 sleep 10
 
 echo "AFTER SLEEP"
 
 echo "MARY:"
-ps -p $mary_pid -o etime=
+ps -p $mary_pid -o cputime=
 echo "JANE:"
-ps -p $jane_pid -o etime=
+ps -p $jane_pid -o cputime=
 echo "SAM:"
-ps -p $sam_pid -o etime=
+ps -p $sam_pid -o cputime=
 echo "JIM:"
-ps -p $jim_pid -o etime=
+ps -p $jim_pid -o cputime=
 echo "PAT:"
-ps -p $pat_pid -o etime=
+ps -p $pat_pid -o cputime=
 
-#echo "===================================================\n"
+#echo "==========================\n"
 #     "=         removing and adding proccess            ="
-#     "==================================================="
+#     "=========================="
 #echo "Killing Marry's proccess (and starting an new one)."
 #su Marry
 #su -c "./usertest.sh" -m Mary./test&
@@ -61,21 +61,21 @@ ps -p $pat_pid -o etime=
 #$!>>mary_pid
 #exit
 #
-#echo "===================================================\n"
+#echo "==========================\n"
 #echo "=                 Testing preemption              ="
-#echo "==================================================="
+#echo "=========================="
 #echo "BEFORE BUSSY WAIT"
 #
 #echo "MARY:"
-#ps -p $mary_pid -o etime=
+#ps -p $mary_pid -o cputime=
 #echo "JANE:"
-#ps -p $jane_pid -o etime=
+#ps -p $jane_pid -o cputime=
 #echo "SAM:"
-#ps -p $sam_pid -o etime=
+#ps -p $sam_pid -o cputime=
 #echo "JIM:"
-#ps -p $jim_pid -o etime=
+#ps -p $jim_pid -o cputime=
 #echo "PAT:"
-#ps -p $pat_pid -o etime=
+#ps -p $pat_pid -o cputime=
 #echo "Running"
 #TIME=$(date +%S)
 #while [[ $TIME -eq $(date +%S) ]]; do
@@ -84,14 +84,110 @@ ps -p $pat_pid -o etime=
 #echo "After running"
 #
 #echo "MARY:"
-#ps -p $mary_pid -o etime=
+#ps -p $mary_pid -o cputime=
 #echo "JANE:"
-#ps -p $jane_pid -o etime=
+#ps -p $jane_pid -o cputime=
 #echo "SAM:"
-#ps -p $sam_pid -o etime=
+#ps -p $sam_pid -o cputime=
 #echo "JIM:"
-#ps -p $jim_pid -o etime=
+#ps -p $jim_pid -o cputime=
 #echo "PAT:"
-#ps -p $pat_pid -o etime=
+#ps -p $pat_pid -o cputime=
 #
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

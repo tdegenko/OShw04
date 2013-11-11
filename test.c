@@ -20,8 +20,14 @@ int main(int argc, char *argv[]){
     //        default:
     //            //do parrent stuff
     //    }
-    struct sched_param sp = { .sched_priority = 50 };
-    int ret=sched_setscheduler(getpid(),SCHED_GWRR,&sp);
+    struct sched_param * sp=malloc(sizeof(struct sched_param));
+    int ret=sched_getparam(0,sp);
+    if(ret==-1){
+        perror("Error:");
+        return -1;
+    }
+    
+    ret=sched_setscheduler(0,SCHED_GWRR,sp);
     if(ret==-1){
         perror("Error:");
         return -1;
