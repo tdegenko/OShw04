@@ -5,12 +5,6 @@
  * Functional(?) groupless RR scheduler, derived from sched_rt.c
  */
 
-/* We don't know yet... */
-/* 
-#define NUM_GROUPS 1
-static struct list_head group_queues[NUM_GROUPS];
- */
-#include <linux/sched.h>
 #define GWRR_WEIGHT 10
 
 /* Group Structure */
@@ -21,12 +15,11 @@ struct gwrr_group {
     struct list_head queue;
 };
 
-/* Will need initialization... in sched_init? */
-/* Initialize group list */
-static LIST_HEAD(group_queue);
+/* Initialize group list. This is more of a list than a queue
+ * since nothing gets shifted out...  */
+static LIST_HEAD(group_list);
 
-/* Whose turn is it? Or can we do this better? */
-/* we're going to do it this way for now */
+/* Whose turn is it? we're going to do it this way for now */
 static gid_t cur_group = 0;
 
 /* Necessary?? */
@@ -51,10 +44,11 @@ static void set_cpus_allowed_gwrr(struct task_struct *p, cpumask_t *new_mask)
 
 static void check_preempt_curr_gwrr(struct rq *rq, struct task_struct *p)
 {
-	/* GWRR has lowest priority - ALWAYS preempt! */
+	/* GWRR has lowest priority - ALWAYS preempt!
+	 *  (Well, except for SCHED_IDLE of course...)  */
 	/* Do we need to update the timing info here?? */
 //	printk("Preempting GWRR task...");
-    if(p->policy<5){
+    	if(p->policy != SCHED_IDLE){
 //        printk("task pre-empted by %s\nwith scheduler %d\n",p->comm,p->policy);
     	resched_task(rq->curr);
     }
@@ -62,32 +56,39 @@ static void check_preempt_curr_gwrr(struct rq *rq, struct task_struct *p)
 
 struct gwrr_group * get_group(gid_t gid){
   
-  struct gwrr_group * pos;
+	struct gwrr_group * pos;
 
-  list_for_each_entry(pos, &group_queue, groups){
-    if(pos->gid == gid){
-      return pos;
-    }
-  }
-  return (struct event *) NULL;
+	list_for_each_entry(pos, &group_list, groups){
+		if(pos->gid == gid){
+			return pos;
+		}
+	}
+	
+	return (struct event *) NULL;
 }
 
 static void enqueue_task_gwrr(struct rq *rq, struct task_struct *p, int wakeup)
 {
 	struct sched_gwrr_entity *new;
 	struct list_head *queue;
-    printk("Enqueuing new GWRR task %s\n",p->comm);
-    gid_t gid= p->gid;
-    struct gwrr_group * group=get_group(gid);
-    if(group==NULL){
-        group=kmalloc(sizeof(struct gwrr_group), GFP_KERNEL);
-        group->gid=gid;
-        group->weight=GWRR_WEIGHT;
-        group->used=0;
-        group->queue=(struct list_head)LIST_HEAD_INIT(group->queue);
-        list_add_tail(group,&group_queue);
-        printk("added new group for %d\n",gid);
-    }
+	struct gwrr_group *group;
+	gid_t gid; 
+
+	printk("Enqueuing new GWRR task %s\n",p->comm);
+	
+	gid = p->gid;
+	group=get_group(gid);
+
+	if(group==NULL){
+		group=kmalloc(sizeof(struct gwrr_group), GFP_KERNEL);
+		group->gid=gid;
+		group->weight=GWRR_WEIGHT;
+		group->used=0;
+		group->queue=(struct list_head)LIST_HEAD_INIT(group->queue);
+		/* Add the group's list element to the group list */
+		list_add_tail(&group->groups,&group_list);
+		printk("added new group for %d\n",gid);
+	}
 	queue = &(group->queue);
 
 	new = &p->gwrr_se;
@@ -95,7 +96,7 @@ static void enqueue_task_gwrr(struct rq *rq, struct task_struct *p, int wakeup)
  	 * putting the new task at the end of the queue! */ 
 	list_add_tail(&new->run_list,queue);
 printk("Done enqueuing\n");
-	/* Handle wakeup... */	
+	/* Handle wakeup? */	
 }
 
 static void dequeue_task_gwrr(struct rq *rq, struct task_struct *p, int sleep)
@@ -107,20 +108,23 @@ static void dequeue_task_gwrr(struct rq *rq, struct task_struct *p, int sleep)
  
 	list_del_init(&sge->run_list);
 
-	/* Handle sleep... */
+	/* Handle sleep? */
 }
 
 static void yield_task_gwrr(struct rq *rq)
 {
 	struct sched_gwrr_entity *sge;
 	struct list_head *queue;
+	struct gwrr_group *group;
+	gid_t gid;
+
 printk("Yielding from GWRR task\n");
 	/*
-	 ->curr is the currently running GWRR task 
+	 * rq->curr is the currently running GWRR task 
 	 * (GWRR because the kernel called this function!)
 	 */
-    gid_t gid= rq->curr->gid;
-    struct gwrr_group * group=get_group(gid);
+	gid= rq->curr->gid;
+	group=get_group(gid);
 	sge = &rq->curr->gwrr_se;
 	queue = &(group->queue);
 
@@ -132,42 +136,43 @@ printk("Done yielding\n");
 
 static struct task_struct *pick_next_task_gwrr(struct rq *rq)
 {
-	/*struct list_head queue = group_queues[cur_group];*/
 	struct list_head *queue;
 	struct sched_gwrr_entity *next;
 	struct task_struct *p;
-    struct gwrr_group * group;
+	struct gwrr_group * group;
+	
 	queue = NULL;
-    if(group_queue.next==group_queue.prev){
-        return NULL;
-    }else if(cur_group!=0){
-        group=get_group(cur_group);
-        if(group==NULL){
-            /* current group does not exist */
-            queue=&list_first_entry(group_queue.next,struct gwrr_group,groups)->queue;
-        }else if(group->used >= group->weight){
-            /* current group has used all it's time */
-            group->used=0;
-            group=list_entry(group,struct gwrr_group,groups);
-            cur_group=group->gid;
-            queue=&group->queue;
-        }else{
-            /* current group has time left */
-            group->used++;
-            queue=&group->queue;
-        }
-    }else{
-        /* current group has not been set yet*/
-        group=list_first_entry(group_queue.next,struct gwrr_group,groups);
-        cur_group=group->gid;
-        queue=&group->queue;
-    }
+	if(group_list.next==group_list.prev){
+		return NULL;
+	}else if(cur_group!=0){
+		group=get_group(cur_group);
+		if(group==NULL){
+			/* current group does not exist */
+			queue=&list_first_entry(group_list.next,struct gwrr_group,groups)->queue;
+		}else if(group->used >= group->weight){
+			/* current group has used all it's time */
+			group->used=0;
+			/* select next group */
+			group=list_entry(group->groups.next,struct gwrr_group,groups);
+			cur_group=group->gid;
+			queue=&group->queue;
+		}else{
+			/* current group has time left */
+			group->used++;
+			queue=&group->queue;
+		}
+	}else{
+		/* current group has not been set yet*/
+		group=list_first_entry(group_list.next,struct gwrr_group,groups);
+		cur_group=group->gid;
+		queue=&group->queue;
+	}
 //    printk("cur_group:\t%d\n",cur_group);
 
 	/* Check for empty queue. */
 	if (list_empty(queue)) {
 //        printk("Queue empty:\t%d\n");
-        cur_group=list_entry(group->groups.next,struct gwrr_group,groups)->gid;
+		cur_group=list_entry(group->groups.next,struct gwrr_group,groups)->gid;
 		return NULL; /* no GWRR tasks left (for this group)! */
 	}
 
@@ -230,9 +235,11 @@ static void task_tick_gwrr(struct rq *rq, struct task_struct *p, int queued)
 	/* On every kernel timer tick, decrement counter */
 	sge = &p->gwrr_se;
 	sge->time_slice--;
-if (sge->time_slice < 0) printk("PANIC: We broke the timer!\n");
-else printk("Tick: New ts: %d\n",sge->time_slice);
+
+printk("Tick: New ts: %d\n",sge->time_slice);
+	
 	if (sge->time_slice > 0) return;
+
 printk("Timeslice exhausted, refilling...\n");
 	/* Timeslice exhausted, refill counter... */
 	sge->time_slice = DEF_TIMESLICE;
@@ -295,6 +302,11 @@ const struct sched_class gwrr_sched_class = {
  
         .prio_changed           = prio_changed_gwrr,
         .switched_to            = switched_to_gwrr,
+
+#ifdef CONFIG_SMP
+	.select_task_rq		= select_task_rq_gwrr,
+	.set_cpus_allowed	= set_cpus_allowed_gwrr
+#endif
  
 };
 
@@ -303,24 +315,29 @@ const struct sched_class gwrr_sched_class = {
  */
 asmlinkage int sys_getgroupweight(int gid)
 {
+	struct gwrr_group *group;
+
 	printk("getgroupweight called with gid %d\n",gid);
-    struct gwrr_group * group = get_group(gid);
-    if(group==NULL){
-        printk("group not found\n");
-        return -1;
-    }
+	group = get_group(gid);
+	if(group==NULL){
+		printk("group not found\n");
+		return -1;
+	}
 	return group->weight;
 }
 
 asmlinkage int sys_setgroupweight(int gid, int weight)
 {
+	struct gwrr_group *group;
+
 	printk("setgroupweight called with gid %d, weight %d\n",gid,weight);
-    struct gwrr_group * group = get_group(gid);
-    if(group==NULL){
-        printk("group not found\n");
-        return -1;
-    }
-    group->weight=weight;
+	group = get_group(gid);
+	if(group==NULL){
+		printk("group not found\n");
+		return -1;
+	}
+	
+	group->weight=weight;
 	return 0;
 }
 
