@@ -4193,7 +4193,7 @@ need_resched_nonpreemptible:
 
 	if (likely(prev != next)) {
 if (prev->policy == SCHED_GWRR)
-	printk("%s yield to %s",prev->comm,next->comm);
+	printk("%s yield to %s\n",prev->comm,next->comm);
 		sched_info_switch(prev, next);
 
 		rq->nr_switches++;
@@ -4882,7 +4882,7 @@ recheck:
 	spin_unlock_irqrestore(&p->pi_lock, flags);
 
 	rt_mutex_adjust_pi(p);
-if (policy == SCHED_GWRR) printk("Set scheduling to GWRR...");
+if (policy == SCHED_GWRR) printk("Set scheduling to GWRR...\n");
 	return 0;
 }
 EXPORT_SYMBOL_GPL(sched_setscheduler);

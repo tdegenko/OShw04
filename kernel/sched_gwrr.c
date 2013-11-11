@@ -51,11 +51,13 @@ static void set_cpus_allowed_gwrr(struct task_struct *p, cpumask_t *new_mask)
 
 static void check_preempt_curr_gwrr(struct rq *rq, struct task_struct *p)
 {
-    printk("pre-empting task\n");
 	/* GWRR has lowest priority - ALWAYS preempt! */
 	/* Do we need to update the timing info here?? */
 //	printk("Preempting GWRR task...");
-	resched_task(rq->curr);
+    if(p->policy<5){
+//        printk("task pre-empted by %s\nwith scheduler %d\n",p->comm,p->policy);
+    	resched_task(rq->curr);
+    }
 }
 
 struct gwrr_group * get_group(gid_t gid){
@@ -114,7 +116,7 @@ static void yield_task_gwrr(struct rq *rq)
 	struct list_head *queue;
 printk("Yielding from GWRR task\n");
 	/*
-	 * rq->curr is the currently running GWRR task 
+	 ->curr is the currently running GWRR task 
 	 * (GWRR because the kernel called this function!)
 	 */
     gid_t gid= rq->curr->gid;
@@ -160,11 +162,13 @@ static struct task_struct *pick_next_task_gwrr(struct rq *rq)
         cur_group=group->gid;
         queue=&group->queue;
     }
-    printk("cur_group:\t%d\b",cur_group);
+//    printk("cur_group:\t%d\n",cur_group);
 
 	/* Check for empty queue. */
 	if (list_empty(queue)) {
-		return NULL; /* no GWRR tasks left! */
+//        printk("Queue empty:\t%d\n");
+        cur_group=list_entry(group->groups.next,struct gwrr_group,groups)->gid;
+		return NULL; /* no GWRR tasks left (for this group)! */
 	}
 
 	/* Select next sched entity in the RR queue */
@@ -252,6 +256,7 @@ static void set_curr_task_gwrr(struct rq *rq)
 	rq->curr->se.exec_start = rq->clock;
 	/* Or maybe there is... if our task is changed to GWRR
 	 * scheduling, we need to start it with a full time slice! */
+
 	rq->curr->gwrr_se.time_slice = DEF_TIMESLICE;
 	printk("Curr ts: %d\n",rq->curr->gwrr_se.time_slice);
 }
@@ -319,4 +324,3 @@ asmlinkage int sys_setgroupweight(int gid, int weight)
 	return 0;
 }
 
- 
