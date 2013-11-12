@@ -5,7 +5,8 @@
  * Almost functional weighted group RR scheduler, influenced by sched_rt.c
  */
 
-/* N.B. Using BUG_ON(group==NULL) when appropriate.
+/*
+ * N.B. Using BUG_ON(group==NULL) when appropriate.
  * Now, BUG_ON is discouraged by the kernel, but the possibility of
  * group==NULL is so remote in those situations that I can't be 
  * bothered to write code to correct the error (besides, how would you?)
@@ -66,11 +67,9 @@ static void check_preempt_curr_gwrr(struct rq *rq, struct task_struct *p)
 {
 	/* GWRR has lowest priority - ALWAYS preempt!
 	 *  (Well, except for SCHED_IDLE of course...)  */
-	/* Do we need to update the timing info here?? */
-//	printk("Preempting GWRR task...");
-    if(p->policy != SCHED_IDLE){
-    	resched_task(rq->curr);
-    }
+	if(p->policy != SCHED_IDLE){
+		resched_task(rq->curr);
+	}
 }
 
 
@@ -81,8 +80,6 @@ static void enqueue_task_gwrr(struct rq *rq, struct task_struct *p, int wakeup)
 	struct gwrr_group *group;
 	gid_t gid; 
 
-	printk("Enqueuing new GWRR task %s\n",p->comm);
-	
 	gid = p->gid;
 	group=get_group(gid);
 
@@ -94,16 +91,6 @@ static void enqueue_task_gwrr(struct rq *rq, struct task_struct *p, int wakeup)
 		group->queue=(struct list_head)LIST_HEAD_INIT(group->queue);
 		/* Add the group's list element to the group list */
 		list_add_tail(&group->groups,&group_list);
-		printk("added new group for %d\n",gid);
-        printk("Current Group List:\n");
-        
-        struct gwrr_group * pos;
-        list_for_each_entry(pos,&group_list,groups){
-            printk("[%d]=>",pos->gid);
-        }
-        printk("\n");
-        
-        
 	}
 	queue = &(group->queue);
 
@@ -111,14 +98,8 @@ static void enqueue_task_gwrr(struct rq *rq, struct task_struct *p, int wakeup)
 	/* add before the head of the queue - effectively
  	 * putting the new task at the end of the queue! */ 
 	list_add_tail(&new->run_list,queue);
-    printk("per-group queue for %d:\n",gid);
-    struct list_head * pos;
-    list_for_each(pos,queue){
-        printk("[%x]=>",pos);
-    }
-    printk("\n");
-printk("Done enqueuing\n");
-	/* Handle wakeup? */	
+	
+	/* Don't bother with wakeup */	
 }
 
 static void dequeue_task_gwrr(struct rq *rq, struct task_struct *p, int sleep)
@@ -127,10 +108,9 @@ static void dequeue_task_gwrr(struct rq *rq, struct task_struct *p, int sleep)
 
  	/* delete the current sched entity from the queue */
 	sge = &rq->curr->gwrr_se;
- 
 	list_del_init(&sge->run_list);
 
-	/* Handle sleep? */
+	/* Don't bother with sleep */
 }
 
 static void yield_task_gwrr(struct rq *rq)
@@ -140,7 +120,6 @@ static void yield_task_gwrr(struct rq *rq)
 	struct gwrr_group *group;
 	gid_t gid;
 
-printk("Yielding from GWRR task\n");
 	/*
 	 * rq->curr is the currently running GWRR task 
 	 * (GWRR because the kernel called this function!)
@@ -155,13 +134,6 @@ printk("Yielding from GWRR task\n");
 
 	/* Move task back to end of queue. */
 	list_add_tail(&sge->run_list,queue);
-    printk("per-group queue for %d:\n",gid);
-    struct list_head * pos;
-    list_for_each(pos,queue){
-        printk("[%x]=>",pos);
-    }
-    printk("\n");
-printk("Done yielding\n");
 }
 
 static struct task_struct *pick_next_task_gwrr(struct rq *rq)
@@ -172,53 +144,46 @@ static struct task_struct *pick_next_task_gwrr(struct rq *rq)
 	struct gwrr_group * group;
 	
 	queue = NULL;
-	if(group_list.next==group_list.prev){
+	if(list_empty(&group_list)) {
 		return NULL;
-	}else if(cur_group!=0){
+	} else if(cur_group!=0) {
 		group=get_group(cur_group);
 		BUG_ON(group==NULL); /* shouldn't happen! */
-	/* current group does not exist - code commented out*/
-	//		group = list_first_entry(&group_list,struct gwrr_group,groups);
-            //cur_group=group->gid;
-            //queue=&group->queue;
-//            printk("cur_group set to %d\n",cur_group);
-	    if(group->used >= group->weight){
+
+		if(group->used >= group->weight){
 			/* current group has used all it's time */
 			group->used=0;
-			/* select next group */
-            if(group->groups.next==&group_list){
-                group = list_first_entry(&group_list,struct gwrr_group,groups);
-            }else{
-			    group=list_entry(group->groups.next,struct gwrr_group,groups);
-            }
+			/* select next group - avoid list head! */
+			if(group->groups.next==&group_list){
+				group = list_first_entry(&group_list,struct gwrr_group,groups);
+ 			} else {
+				group=list_entry(group->groups.next,struct gwrr_group,groups);
+			}
 			cur_group=group->gid;
-//            printk("cur_group set to %d\n",cur_group);
 			queue=&group->queue;
-		}else{
+		} else {
 			/* current group has time left */
 			group->used++;
 			queue=&group->queue;
-//            printk("%d quanta used of %d\n",group->used,group->weight);
 		}
-	}else{
+	} else {
 		/* current group has not been set yet*/
-		group=list_first_entry(group_list.next,struct gwrr_group,groups);
+		group=list_first_entry(&group_list,struct gwrr_group,groups);
 		cur_group=group->gid;
-//        printk("cur_group set to %d\n",cur_group);
 		queue=&group->queue;
 	}
-//    printk("cur_group:\t%d\n",cur_group);
-//    printk("per-group queue for %d:\n",cur_group);
-//    struct list_head * pos;
-//    list_for_each(pos,queue){
-//        printk("[%x]=>",pos);
-//    }
-//    printk("\n");
 
-	/* Check for empty queue. */
+	/* 
+	 * If queue is empty, this group has no runnable tasks left.
+	 * Rather than have it block other GWRR tasks, move the pointer 
+	 * to the next one - wasting only one timeslice...
+	 */
 	if (list_empty(queue)) {
-//        printk("Queue empty:\t%d\n");
-		cur_group=list_entry(group->groups.next,struct gwrr_group,groups)->gid;
+		if(group->groups.next==&group_list) {
+			cur_group = list_first_entry(&group_list,struct gwrr_group,groups)->gid;
+		} else {
+			cur_group=list_entry(group->groups.next,struct gwrr_group,groups)->gid;
+		}
 		return NULL; /* no GWRR tasks left (for this group)! */
 	}
 
@@ -241,7 +206,7 @@ static struct task_struct *pick_next_task_gwrr(struct rq *rq)
 	}
 #endif
 
-//	printk("GWRR checked, task found!\n");
+	printk("GWRR checked, task found!\n");
 	
 	/* note start time - necessary? */
 	p->se.exec_start = rq->clock;
@@ -250,17 +215,14 @@ static struct task_struct *pick_next_task_gwrr(struct rq *rq)
 
 static void put_prev_task_gwrr(struct rq *rq, struct task_struct *p)
 {
-	/* reset start time as for all schedulers - necessary */
-	p->se.exec_start = 0;
+	/* currently not doing anything here... */
 }
 
 static void task_new_gwrr(struct rq *rq, struct task_struct *p)
 {
-	
 	/* Initialize counter with default timeslice */
 	p->gwrr_se.time_slice = DEF_TIMESLICE;
 
-printk("New GWRR task created?\n");
 }
 
 static void task_tick_gwrr(struct rq *rq, struct task_struct *p, int queued)
@@ -273,18 +235,8 @@ static void task_tick_gwrr(struct rq *rq, struct task_struct *p, int queued)
 	/* On every kernel timer tick, decrement counter */
 	sge = &p->gwrr_se;
 	sge->time_slice--;
-
-//printk("Tick: New ts: %d\n",sge->time_slice);
-	
 	if (sge->time_slice > 0) return;
 
-printk("Timeslice exhausted, moving to next.\n");
-//    struct list_head * pos;
-//    printk("per-group queue for %d\n",p->gid);
-//    list_for_each(pos,&sge->run_list){
-//        printk("[%x]=>",pos);
-//    }
-//    printk("\n");
 	/* Timeslice exhausted, refill counter... */
 	sge->time_slice = DEF_TIMESLICE;
 
@@ -301,42 +253,27 @@ printk("Timeslice exhausted, moving to next.\n");
 		list_del_init(&sge->run_list);
 		list_add_tail(&sge->run_list,queue);
 
-//printk("moved to the end of the list, re-scheduling.\n");
-//    printk("per-group queue for %d\n",p->gid);
-//    list_for_each(pos,&sge->run_list){
-//        printk("[%x]=>",pos);
-//    }
-//    printk("\n");
 		set_tsk_need_resched(p);		
 	}
-	/* No need to reschedule if we're the only one in the queue...
+	/*
+	 *  No need to reschedule if we're the only one in the queue...
 	 * if anything, we'll be preempted by a higher-priority
-	 * RT or GWRR process */
+	 * RT or GWRR process
+	 */
 }
 
 static void set_curr_task_gwrr(struct rq *rq)
 {
-	/* Seems to be used for updating priorities, but there's
- 	 * not much point in that for GWRR... is there? */ 
-	rq->curr->se.exec_start = rq->clock;
-	/* Or maybe there is... if our task is changed to GWRR
-	 * scheduling, we need to start it with a full time slice! */
+	/* When our GWRR task is set to current, we need to start it
+	 *  with a full time slice! */
 
 	rq->curr->gwrr_se.time_slice = DEF_TIMESLICE;
-	printk("Curr ts: %d\n",rq->curr->gwrr_se.time_slice);
 }
 
 static void switched_to_gwrr(struct rq *rq, struct task_struct *p,
                              int running)
 {
-	printk("Switched to gwrr\n");
-	/* Necessary? */
-}
-
-static void prio_changed_gwrr(struct rq *rq, struct task_struct *p,
-                              int oldprio, int running)
-{
-	/* Again, seems unnecessary */
+	/* Currently not doing anything here... */
 }
 
 /*
@@ -358,7 +295,6 @@ const struct sched_class gwrr_sched_class = {
 	.task_new		= task_new_gwrr,
         .task_tick              = task_tick_gwrr,
  
-        .prio_changed           = prio_changed_gwrr,
         .switched_to            = switched_to_gwrr,
 
 #ifdef CONFIG_SMP
