@@ -42,18 +42,6 @@ static void set_cpus_allowed_gwrr(struct task_struct *p, cpumask_t *new_mask)
 }
 #endif 
 
-static void check_preempt_curr_gwrr(struct rq *rq, struct task_struct *p)
-{
-	/* GWRR has lowest priority - ALWAYS preempt!
-	 *  (Well, except for SCHED_IDLE of course...)  */
-	/* Do we need to update the timing info here?? */
-//	printk("Preempting GWRR task...");
-    	if(p->policy != SCHED_IDLE){
-//        printk("task pre-empted by %s\nwith scheduler %d\n",p->comm,p->policy);
-    	resched_task(rq->curr);
-    }
-}
-
 struct gwrr_group * get_group(gid_t gid){
   
 	struct gwrr_group * pos;
@@ -66,6 +54,17 @@ struct gwrr_group * get_group(gid_t gid){
 	
 	return (struct event *) NULL;
 }
+static void check_preempt_curr_gwrr(struct rq *rq, struct task_struct *p)
+{
+	/* GWRR has lowest priority - ALWAYS preempt!
+	 *  (Well, except for SCHED_IDLE of course...)  */
+	/* Do we need to update the timing info here?? */
+//	printk("Preempting GWRR task...");
+    if(p->policy != SCHED_IDLE){
+    	resched_task(rq->curr);
+    }
+}
+
 
 static void enqueue_task_gwrr(struct rq *rq, struct task_struct *p, int wakeup)
 {
@@ -88,6 +87,15 @@ static void enqueue_task_gwrr(struct rq *rq, struct task_struct *p, int wakeup)
 		/* Add the group's list element to the group list */
 		list_add_tail(&group->groups,&group_list);
 		printk("added new group for %d\n",gid);
+        printk("Current Group List:\n");
+        
+        struct gwrr_group * pos;
+        list_for_each_entry(pos,&group_list,groups){
+            printk("[%d]=>",pos->gid);
+        }
+        printk("\n");
+        
+        
 	}
 	queue = &(group->queue);
 
@@ -95,6 +103,12 @@ static void enqueue_task_gwrr(struct rq *rq, struct task_struct *p, int wakeup)
 	/* add before the head of the queue - effectively
  	 * putting the new task at the end of the queue! */ 
 	list_add_tail(&new->run_list,queue);
+    printk("per-group queue for %d:\n",gid);
+    struct list_head * pos;
+    list_for_each(pos,queue){
+        printk("[%x]=>",pos);
+    }
+    printk("\n");
 printk("Done enqueuing\n");
 	/* Handle wakeup? */	
 }
@@ -125,12 +139,38 @@ printk("Yielding from GWRR task\n");
 	 */
 	gid= rq->curr->gid;
 	group=get_group(gid);
+    if(group==NULL){
+        group=kmalloc(sizeof(struct gwrr_group), GFP_KERNEL);
+        group->gid=gid;
+        group->weight=GWRR_WEIGHT;
+        group->used=0;
+        group->queue=(struct list_head)LIST_HEAD_INIT(group->queue);
+        /* Add the group's list element to the group list */
+        list_del(&group->groups);
+        list_add_tail(&group->groups,&group_list);
+        printk("moved gtask to end of list.\n");
+        printk("Current Group List:\n");
+
+        struct gwrr_group * pos;
+        list_for_each_entry(pos,&group_list,groups){
+            printk("[%d]=>",pos->gid);
+        }
+        printk("\n");
+
+
+    }
+
 	sge = &rq->curr->gwrr_se;
 	queue = &(group->queue);
 
 	/* Move task back to end of queue. */
-	list_del_init(&sge->run_list);
 	list_add_tail(&sge->run_list,queue);
+    printk("per-group queue for %d:\n",gid);
+    struct list_head * pos;
+    list_for_each(pos,queue){
+        printk("[%x]=>",pos);
+    }
+    printk("\n");
 printk("Done yielding\n");
 }
 
@@ -148,26 +188,42 @@ static struct task_struct *pick_next_task_gwrr(struct rq *rq)
 		group=get_group(cur_group);
 		if(group==NULL){
 			/* current group does not exist */
-			queue=&list_first_entry(group_list.next,struct gwrr_group,groups)->queue;
+			group = list_first_entry(&group_list,struct gwrr_group,groups);
+            cur_group=group->gid;
+            queue=&group->queue;
+//            printk("cur_group set to %d\n",cur_group);
 		}else if(group->used >= group->weight){
 			/* current group has used all it's time */
 			group->used=0;
 			/* select next group */
-			group=list_entry(group->groups.next,struct gwrr_group,groups);
+            if(group->groups.next==&group_list){
+                group = list_first_entry(&group_list,struct gwrr_group,groups);
+            }else{
+			    group=list_entry(group->groups.next,struct gwrr_group,groups);
+            }
 			cur_group=group->gid;
+//            printk("cur_group set to %d\n",cur_group);
 			queue=&group->queue;
 		}else{
 			/* current group has time left */
 			group->used++;
 			queue=&group->queue;
+//            printk("%d quanta used of %d\n",group->used,group->weight);
 		}
 	}else{
 		/* current group has not been set yet*/
 		group=list_first_entry(group_list.next,struct gwrr_group,groups);
 		cur_group=group->gid;
+//        printk("cur_group set to %d\n",cur_group);
 		queue=&group->queue;
 	}
 //    printk("cur_group:\t%d\n",cur_group);
+//    printk("per-group queue for %d:\n",cur_group);
+//    struct list_head * pos;
+//    list_for_each(pos,queue){
+//        printk("[%x]=>",pos);
+//    }
+//    printk("\n");
 
 	/* Check for empty queue. */
 	if (list_empty(queue)) {
@@ -178,7 +234,6 @@ static struct task_struct *pick_next_task_gwrr(struct rq *rq)
 
 	/* Select next sched entity in the RR queue */
 	next = list_entry(queue->next, struct sched_gwrr_entity, run_list);
-	
 	/* Find task struct from gwrr sched entity */
 	p = container_of(next, struct task_struct, gwrr_se);
 
@@ -196,7 +251,7 @@ static struct task_struct *pick_next_task_gwrr(struct rq *rq)
 	}
 #endif
 
-	printk("GWRR checked, task found!\n");
+//	printk("GWRR checked, task found!\n");
 	
 	/* note start time - necessary? */
 	p->se.exec_start = rq->clock;
@@ -236,23 +291,35 @@ static void task_tick_gwrr(struct rq *rq, struct task_struct *p, int queued)
 	sge = &p->gwrr_se;
 	sge->time_slice--;
 
-printk("Tick: New ts: %d\n",sge->time_slice);
+//printk("Tick: New ts: %d\n",sge->time_slice);
 	
 	if (sge->time_slice > 0) return;
 
-printk("Timeslice exhausted, refilling...\n");
+//printk("Timeslice exhausted, moving to next.\n");
+//    struct list_head * pos;
+//    printk("per-group queue for %d\n",p->gid);
+//    list_for_each(pos,&sge->run_list){
+//        printk("[%x]=>",pos);
+//    }
+//    printk("\n");
 	/* Timeslice exhausted, refill counter... */
 	sge->time_slice = DEF_TIMESLICE;
 
  	/* ... and roll to end of queue and request reschedule
  		 if others are waiting */
-	if (sge->run_list.prev != sge->run_list.next) {	
-
+	if (sge->run_list.prev != sge->run_list.next) {
+        queue=&sge->run_list.next;
 		list_del_init(&sge->run_list);
 		list_add_tail(&sge->run_list,queue);
 
-		set_tsk_need_resched(p);		
 	}
+//printk("moved to the end of the list, re-scheduling.\n");
+//    printk("per-group queue for %d\n",p->gid);
+//    list_for_each(pos,&sge->run_list){
+//        printk("[%x]=>",pos);
+//    }
+//    printk("\n");
+	set_tsk_need_resched(p);		
 
 }
 

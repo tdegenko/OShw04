@@ -4193,7 +4193,7 @@ need_resched_nonpreemptible:
 
 	if (likely(prev != next)) {
 if (prev->policy == SCHED_GWRR)
-	printk("%s yield to %s\n",prev->comm,next->comm);
+//	printk("%s ( gid:%d, uid:%d ) yield proccessor to %s\n",prev->comm,prev->gid,prev->uid,next->comm);
 		sched_info_switch(prev, next);
 
 		rq->nr_switches++;
