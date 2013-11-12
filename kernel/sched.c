@@ -4880,7 +4880,7 @@ recheck:
 	spin_unlock_irqrestore(&p->pi_lock, flags);
 
 	rt_mutex_adjust_pi(p);
-if (policy == SCHED_GWRR) printk("Set scheduling to GWRR...\n");
+	
 	return 0;
 }
 EXPORT_SYMBOL_GPL(sched_setscheduler);
@@ -7873,8 +7873,6 @@ void __init sched_init(void)
 	current->sched_class = &fair_sched_class;
 
 	scheduler_running = 1;
-
-	printk("Greetings from GWRR (not really)\n");
 }
 
 #ifdef CONFIG_DEBUG_SPINLOCK_SLEEP
