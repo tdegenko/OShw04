@@ -4,22 +4,9 @@
 #include <sys/syscall.h>
 #include <sched.h>
 #include "libsched_gwrr.h"
+#include <sys/times.h> 
 
 int main(int argc, char *argv[]){
-    printf("\nDiving to kernel level\n\n");
-    //    syscall(_CS2456_TEST_ , 2456);
-    //    printf("\nRising to user level\n\n");
-
-    // Fork of childeren
-    //    switch(fork()){
-    //        case 0:
-    //            //do Child stuff
-    //        case -1:
-    //            //fork error
-    //            return -1
-    //        default:
-    //            //do parrent stuff
-    //    }
     struct sched_param * sp=malloc(sizeof(struct sched_param));
     int ret=sched_getparam(0,sp);
     if(ret==-1){
@@ -27,14 +14,22 @@ int main(int argc, char *argv[]){
         return -1;
     }
     
+    pid_t pid=getpid();
     ret=sched_setscheduler(0,SCHED_GWRR,sp);
     if(ret==-1){
         perror("Error:");
         return -1;
     }
     printf("scheduler changed!\n");
+    long count=0;
+    struct tms time;
     while(1){
+        times(&time);
+        printf("PID: %d, 
+time:%d\n",pid,time.tms_utime+time.tms_stime);
     }
+                              
+                                     
     return 0;
 }
 

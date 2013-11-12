@@ -20,9 +20,9 @@ export sam_pid=$(cat Sam_pid)
 export jim_pid=$(cat Jim_pid)
 export pat_pid=$(cat Pat_pid)
 
-echo "==========================\n"
-echo "=             testing time allocation             ="
-echo "=========================="
+echo "==============================="
+echo "=  testing time allocation    ="
+echo "==============================="
 echo "BEFORE SLEEP"
 
 echo "MARY:"
@@ -36,7 +36,7 @@ ps -p $jim_pid -o cputime=
 echo "PAT:"
 ps -p $pat_pid -o cputime=
 echo "SLEEPING"
-sleep 10
+sleep 30
 
 echo "AFTER SLEEP"
 
@@ -94,7 +94,6 @@ ps -p $pat_pid -o cputime=
 #echo "PAT:"
 #ps -p $pat_pid -o cputime=
 #
-
 
 
 
