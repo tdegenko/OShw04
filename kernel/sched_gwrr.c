@@ -2,7 +2,15 @@
  * linux/sched_gwrr.c:
  * 	Group-Weighted Round Robin scheduling class.
  *
- * Functional(?) groupless RR scheduler, derived from sched_rt.c
+ * Almost functional weighted group RR scheduler, influenced by sched_rt.c
+ */
+
+/* N.B. Using BUG_ON(group==NULL) when appropriate.
+ * Now, BUG_ON is discouraged by the kernel, but the possibility of
+ * group==NULL is so remote in those situations that I can't be 
+ * bothered to write code to correct the error (besides, how would you?)
+ * So we just pull the kernel down with us. If we've done the job
+ * properly, of course, this will never happen.
  */
 
 #define GWRR_WEIGHT 10
@@ -52,7 +60,7 @@ struct gwrr_group * get_group(gid_t gid){
 		}
 	}
 	
-	return (struct event *) NULL;
+	return (struct gwrr_group *) NULL;
 }
 static void check_preempt_curr_gwrr(struct rq *rq, struct task_struct *p)
 {
@@ -139,26 +147,8 @@ printk("Yielding from GWRR task\n");
 	 */
 	gid= rq->curr->gid;
 	group=get_group(gid);
-    if(group==NULL){
-        group=kmalloc(sizeof(struct gwrr_group), GFP_KERNEL);
-        group->gid=gid;
-        group->weight=GWRR_WEIGHT;
-        group->used=0;
-        group->queue=(struct list_head)LIST_HEAD_INIT(group->queue);
-        /* Add the group's list element to the group list */
-        list_del(&group->groups);
-        list_add_tail(&group->groups,&group_list);
-        printk("moved gtask to end of list.\n");
-        printk("Current Group List:\n");
-
-        struct gwrr_group * pos;
-        list_for_each_entry(pos,&group_list,groups){
-            printk("[%d]=>",pos->gid);
-        }
-        printk("\n");
-
-
-    }
+	/* This should never happen! */
+	BUG_ON(group==NULL);
 
 	sge = &rq->curr->gwrr_se;
 	queue = &(group->queue);
@@ -186,13 +176,13 @@ static struct task_struct *pick_next_task_gwrr(struct rq *rq)
 		return NULL;
 	}else if(cur_group!=0){
 		group=get_group(cur_group);
-		if(group==NULL){
-			/* current group does not exist */
-			group = list_first_entry(&group_list,struct gwrr_group,groups);
-            cur_group=group->gid;
-            queue=&group->queue;
+		BUG_ON(group==NULL); /* shouldn't happen! */
+	/* current group does not exist - code commented out*/
+	//		group = list_first_entry(&group_list,struct gwrr_group,groups);
+            //cur_group=group->gid;
+            //queue=&group->queue;
 //            printk("cur_group set to %d\n",cur_group);
-		}else if(group->used >= group->weight){
+	    if(group->used >= group->weight){
 			/* current group has used all it's time */
 			group->used=0;
 			/* select next group */
@@ -267,15 +257,6 @@ static void put_prev_task_gwrr(struct rq *rq, struct task_struct *p)
 static void task_new_gwrr(struct rq *rq, struct task_struct *p)
 {
 	
-	/* 
-	 * Give new task's sched_gwrr_entity a link to the run-queue
- 	 * it is on. The task will remain on the same processor and
- 	 * we need to make sure that we don't attempt to run it on
- 	 * any other processor; we use the runqueue to determine
- 	 * which processor is running this task in pick_next_task
- 	 */
-	p->gwrr_se.rq = rq;
-
 	/* Initialize counter with default timeslice */
 	p->gwrr_se.time_slice = DEF_TIMESLICE;
 
@@ -286,6 +267,8 @@ static void task_tick_gwrr(struct rq *rq, struct task_struct *p, int queued)
 {
 	struct sched_gwrr_entity *sge;
 	struct list_head *queue;
+	struct gwrr_group *group;
+	gid_t gid;
 
 	/* On every kernel timer tick, decrement counter */
 	sge = &p->gwrr_se;
@@ -295,7 +278,7 @@ static void task_tick_gwrr(struct rq *rq, struct task_struct *p, int queued)
 	
 	if (sge->time_slice > 0) return;
 
-//printk("Timeslice exhausted, moving to next.\n");
+printk("Timeslice exhausted, moving to next.\n");
 //    struct list_head * pos;
 //    printk("per-group queue for %d\n",p->gid);
 //    list_for_each(pos,&sge->run_list){
@@ -308,19 +291,27 @@ static void task_tick_gwrr(struct rq *rq, struct task_struct *p, int queued)
  	/* ... and roll to end of queue and request reschedule
  		 if others are waiting */
 	if (sge->run_list.prev != sge->run_list.next) {
-        queue=&sge->run_list.next;
+		/* Find correct group from task */
+		gid = p->gid;
+		group = get_group(gid);
+		BUG_ON(group==NULL);
+		
+        	queue = &group->queue;
+		
 		list_del_init(&sge->run_list);
 		list_add_tail(&sge->run_list,queue);
 
-	}
 //printk("moved to the end of the list, re-scheduling.\n");
 //    printk("per-group queue for %d\n",p->gid);
 //    list_for_each(pos,&sge->run_list){
 //        printk("[%x]=>",pos);
 //    }
 //    printk("\n");
-	set_tsk_need_resched(p);		
-
+		set_tsk_need_resched(p);		
+	}
+	/* No need to reschedule if we're the only one in the queue...
+	 * if anything, we'll be preempted by a higher-priority
+	 * RT or GWRR process */
 }
 
 static void set_curr_task_gwrr(struct rq *rq)

@@ -1029,10 +1029,8 @@ struct sched_rt_entity {
 struct sched_gwrr_entity {
         struct list_head run_list;
 
-        /* timing... */
+        /* in-timeslice counter */
         unsigned int time_slice;
-	/* link back to original runqueue */
-        struct rq* rq;
 };
 
 struct task_struct {

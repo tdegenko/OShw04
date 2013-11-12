@@ -4747,8 +4747,6 @@ __setscheduler(struct rq *rq, struct task_struct *p, int policy, int prio)
 		break;
 	}
 
-	/* GWRR TODO: Priority settings... */	
-
 	p->rt_priority = prio;
 	p->normal_prio = normal_prio(p);
 	/* we are holding p->pi_lock already */
@@ -4765,7 +4763,7 @@ __setscheduler(struct rq *rq, struct task_struct *p, int policy, int prio)
  * NOTE that the task may be already dead.
  */
 
-/* MODIFIED FOR GWRR SCHEDULING !! TODO: any further changes necessary? */
+/* MODIFIED FOR GWRR SCHEDULING !! */
 
 int sched_setscheduler(struct task_struct *p, int policy,
 		       struct sched_param *param)
