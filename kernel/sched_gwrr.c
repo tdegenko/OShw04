@@ -176,11 +176,17 @@ static struct task_struct *pick_next_task_gwrr(struct rq *rq)
 		return NULL;
 	}else if(cur_group!=0){
 		group=get_group(cur_group);
+        if(group==NULL){
+			group = list_first_entry(&group_list,struct gwrr_group,groups);
+            cur_group=group->gid;
+            queue=&group->queue;
+//            printk("cur_group set to %d\n",cur_group);
+        }
 		BUG_ON(group==NULL); /* shouldn't happen! */
 	/* current group does not exist - code commented out*/
-	//		group = list_first_entry(&group_list,struct gwrr_group,groups);
-            //cur_group=group->gid;
-            //queue=&group->queue;
+//			group = list_first_entry(&group_list,struct gwrr_group,groups);
+//            cur_group=group->gid;
+//            queue=&group->queue;
 //            printk("cur_group set to %d\n",cur_group);
 	    if(group->used >= group->weight){
 			/* current group has used all it's time */
@@ -278,7 +284,7 @@ static void task_tick_gwrr(struct rq *rq, struct task_struct *p, int queued)
 	
 	if (sge->time_slice > 0) return;
 
-printk("Timeslice exhausted, moving to next.\n");
+//printk("Timeslice exhausted, moving to next.\n");
 //    struct list_head * pos;
 //    printk("per-group queue for %d\n",p->gid);
 //    list_for_each(pos,&sge->run_list){
